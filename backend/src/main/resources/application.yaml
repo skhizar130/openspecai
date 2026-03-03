@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: openspecai
+  config:
+    import: optional:file:.env[.properties]
+
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: ${OPENAI_API_KEY}
+      model-name: gpt-4o
+      log-requests: true
+      log-responses: true
+    embedding-model:
+      api-key: ${OPENAI_API_KEY}
+      model-name: text-embedding-3-small
+  chroma:
+    url: ${CHROMA_URL}
+    collection: ${CHROMA_COLLECTION}
+
+openspecai:
+  spectral:
+    rules: .spectral.yaml
+
+openapi.storage-path: generated-specs

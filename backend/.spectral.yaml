@@ -1,0 +1,9 @@
+extends: spectral:oas
+
+rules:
+  operation-description:
+    description: Operation must have description
+    given: $.paths[*][*]
+    then:
+      field: description
+      function: truthy
