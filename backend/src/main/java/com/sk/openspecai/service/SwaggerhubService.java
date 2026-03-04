@@ -9,16 +9,24 @@ import java.time.Duration;
 
 import org.springframework.stereotype.Service;
 
+import com.sk.openspecai.auth.TokenProvider;
+
 @Service
 public class SwaggerhubService {
 
     private HttpClient httpClient;
+    private TokenProvider tokenProvider;
 
-    public SwaggerhubService(HttpClient httpClient) {
+    public SwaggerhubService(
+            HttpClient httpClient,
+            TokenProvider tokenProvider) {
         this.httpClient = httpClient;
+        this.tokenProvider = tokenProvider;
     }
 
-    public void connect(String apiKey, String owner) throws Exception {
+    public void connect() throws Exception {
+        String apiKey = tokenProvider.getToken();
+        String owner = tokenProvider.getOwner();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://api.swaggerhub.com/apis/" + owner))
                 .header("Authorization", "Bearer " + apiKey)
@@ -29,9 +37,6 @@ public class SwaggerhubService {
         HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
         int statusCode = response.statusCode();
 
-        System.out.println("statusCode: " + statusCode);
-        System.out.println("message" + response.body());
-
         if (statusCode == 401 || statusCode == 403) {
             throw new Exception("Invalid SwaggerHub API key");
         }
@@ -39,8 +44,5 @@ public class SwaggerhubService {
         if (statusCode != 200 && statusCode != 204) {
             throw new Exception("SwaggerHub API unavailable");
         }
-
-        // encryptAndPersist(apiKey)
-
     }
 }

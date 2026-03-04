@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sk.openspecai.service.SwaggerhubService;
-import com.sk.openspecai.dto.ConnectRequest;
 import com.sk.openspecai.dto.PromptRequest;
 import com.sk.openspecai.service.ParsingService;
 import com.sk.openspecai.service.SpecStorageService;
@@ -120,12 +119,9 @@ public class OpenSpecController {
         return ResponseEntity.ok(yaml);
     }
 
-    @PostMapping("/api/swaggerhub/connect")
-    public Map<String, String> postMethodName(@RequestBody ConnectRequest requestBody) throws Exception {
-        String apiKey = requestBody.apiKey();
-        String owner = requestBody.owner();
-
-        swaggerhubService.connect(apiKey, owner);
+    @GetMapping("/api/swaggerhub/connect")
+    public Map<String, String> postMethodName() throws Exception {
+        swaggerhubService.connect();
 
         return Map.of("Status", "Connected");
     }
