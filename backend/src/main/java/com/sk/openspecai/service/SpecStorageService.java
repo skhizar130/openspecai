@@ -50,4 +50,25 @@ public class SpecStorageService {
         return Files.readAllLines(filePath);
     }
 
+    public String overwriteCurrentYaml(String specId) throws IOException {
+        Path directory = Paths.get(storagePath);
+        Path currentFilePath = directory.resolve(specId + ".yaml");
+        Path updatedFilePath = directory.resolve(specId + "-updated.yaml");
+
+        if (!Files.exists(currentFilePath)) {
+            throw new FileNotFoundException("No specification exists for " + specId);
+        }
+
+        if (!Files.exists(updatedFilePath)) {
+            throw new FileNotFoundException("No updated specification exists for " + specId);
+        }
+
+        String updatedContent = Files.readString(updatedFilePath);
+        Files.writeString(currentFilePath, updatedContent, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+        Files.delete(updatedFilePath);
+
+        return updatedContent;
+    }
+
 }

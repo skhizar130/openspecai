@@ -128,6 +128,14 @@ Response: Unified diff
 
 ---
 
+### Accept Modification
+
+**GET** `/api/specs/{id}/accept`
+
+Response: Updated spec
+
+---
+
 ### Validate
 
 **GET** `/api/specs/validate/{id}?fix=false`
@@ -141,6 +149,22 @@ Response: Spectral output (JSON)
 **GET** `/api/specs/validate/{id}?fix=true`
 
 Response: Updated OpenAPI specification
+
+---
+
+### Test SwaggerHub connection
+
+**GET** `/api/swaggerhub/connect`
+
+Response: { Status: Connected }
+
+---
+
+### Publish spec to SwaggerHub
+
+**GET** `/api/spec/{id}/publish`
+
+Response: Published successfully
 
 ---
 

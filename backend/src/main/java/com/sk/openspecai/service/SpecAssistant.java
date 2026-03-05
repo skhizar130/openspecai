@@ -21,6 +21,8 @@ public interface SpecAssistant {
 
       For string values containing commas, colons, or special characters (like descriptions), explicitly wrap them in single quotes (e.g., description: 'Text, with comma').
 
+      The example property has been deprecated in favor of the JSON Schema examples keyword.
+
       Ensure the following Spectral validation messages do not occur:
       [{
           "code": "info-contact",

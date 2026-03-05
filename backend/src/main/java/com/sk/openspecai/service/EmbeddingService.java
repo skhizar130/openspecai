@@ -39,7 +39,7 @@ public class EmbeddingService {
         // Retrieve all chunks for a given specId
         public List<SearchResultDTO> retrieveSpecChunks(String specId) {
                 Filter specIdFilter = metadataKey("specId").isEqualTo(specId);
-                return retriveChunksWithFilter(specIdFilter);
+                return retrieveChunksWithFilter(specIdFilter);
         }
 
         // Retrieve and join all chunks for a specific path and method
@@ -57,7 +57,7 @@ public class EmbeddingService {
                                                                                 : Filter.and(pathFilter,
                                                                                                 methodFilter)));
 
-                List<SearchResultDTO> result = retriveChunksWithFilter(combinedFilter);
+                List<SearchResultDTO> result = retrieveChunksWithFilter(combinedFilter);
 
                 // Join all chunks with "---" separator
                 return result.stream()
@@ -74,15 +74,30 @@ public class EmbeddingService {
                 Filter combinedFilter = Filter.and(typeFilter,
                                 schemaName.isEmpty() ? specIdFilter : Filter.and(specIdFilter, schemaNameFilter));
 
-                List<SearchResultDTO> result = retriveChunksWithFilter(combinedFilter);
+                List<SearchResultDTO> result = retrieveChunksWithFilter(combinedFilter);
 
                 return result.stream()
                                 .map(SearchResultDTO::content)
                                 .collect(Collectors.joining("\n---\n"));
         }
 
+        public SearchResultDTO retrieveInfoChunk(String specId) throws Exception {
+                Filter typeFilter = metadataKey("chunkType").isEqualTo("INFO");
+                Filter specIdFilter = metadataKey("specId").isEqualTo(specId);
+
+                Filter combinedFilter = Filter.and(typeFilter, specIdFilter);
+
+                List<SearchResultDTO> results = retrieveChunksWithFilter(combinedFilter);
+
+                if (results.size() == 0) {
+                        throw new Exception("Info not found");
+                }
+
+                return results.get(0);
+        }
+
         // Internal method: search embeddings using a filter
-        private List<SearchResultDTO> retriveChunksWithFilter(Filter filter) {
+        private List<SearchResultDTO> retrieveChunksWithFilter(Filter filter) {
                 float[] zeroVector = new float[1536]; // dummy vector for text-embedding-3-small
                 Embedding dummyEmbedding = Embedding.from(zeroVector);
 

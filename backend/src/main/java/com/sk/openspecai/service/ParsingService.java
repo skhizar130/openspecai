@@ -9,11 +9,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-
+import com.sk.openspecai.dto.SearchResultDTO;
 import com.sk.openspecai.model.Endpoint;
+import com.sk.openspecai.model.SpecInfo;
 
 @Service
 public class ParsingService {
@@ -39,12 +39,12 @@ public class ParsingService {
     }
 
     // Parse YAML and store all chunks into embedding store
-    public String parseAndStoreChunks(String yamlContent, String specId)
+    public String parseAndStoreChunks(String yamlContent, String specId, String name)
             throws JsonMappingException, JsonProcessingException {
 
         JsonNode rootNode = this.yamlMapper.readTree(yamlContent);
 
-        storeGlobalInfo(rootNode, specId);
+        storeGlobalInfo(rootNode, specId, name);
         storeServers(rootNode, specId);
         storeOperations(rootNode, specId);
         storeSchemas(rootNode, specId);
@@ -111,15 +111,17 @@ public class ParsingService {
     }
 
     // Store global info chunk
-    private void storeGlobalInfo(JsonNode rootNode, String specId) throws JsonProcessingException {
+    private void storeGlobalInfo(JsonNode rootNode, String specId, String name)
+            throws JsonProcessingException {
         JsonNode infoNode = rootNode.path("info");
         String openApiVersion = rootNode.path("openapi").asText();
         String infoYaml = yamlMapper.writeValueAsString(infoNode);
 
         embeddingService.add(infoYaml, Map.of(
-                "chunkType", "GLOBAL_INFO",
+                "chunkType", "INFO",
                 "specId", specId,
-                "openapi", openApiVersion));
+                "openapi", openApiVersion,
+                "name", name));
     }
 
     // Merge a single updated operation chunk into the full YAML spec
@@ -136,5 +138,15 @@ public class ParsingService {
         String mergedYaml = yamlMapper.writeValueAsString(specMap);
 
         return mergedYaml;
+    }
+
+    public SpecInfo retriveInfo(String specId) throws Exception {
+        SearchResultDTO resultDTO = embeddingService.retrieveInfoChunk(specId);
+        String name = (String) resultDTO.metadata().get("name");
+        String version = this.yamlMapper
+                .readTree(resultDTO.content())
+                .path("version").asText();
+
+        return new SpecInfo(name, version);
     }
 }

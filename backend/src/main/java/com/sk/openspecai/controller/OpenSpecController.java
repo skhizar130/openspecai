@@ -50,6 +50,13 @@ public class OpenSpecController {
         this.swaggerhubService = swaggerhubService;
     }
 
+    @GetMapping(value = "api/specs/{id}", produces = "text/plain")
+    public ResponseEntity<String> getSpecById(@PathVariable String id) throws IOException {
+        String yaml = specStorageService.readYaml(id, true);
+        // String reconstructedYaml = parsingService.reconstructSpecs(specId);
+        return ResponseEntity.ok(yaml);
+    }
+
     @PostMapping(value = "/api/specs", produces = "text/plain")
     public ResponseEntity<String> generateSpec(@RequestBody PromptRequest request)
             throws NoSuchAlgorithmException, IOException {
@@ -63,7 +70,7 @@ public class OpenSpecController {
         String shortSpecId = specId.substring(0, 16);
 
         // Parse YAML
-        String yaml = parsingService.parseAndStoreChunks(modelRes, shortSpecId);
+        String yaml = parsingService.parseAndStoreChunks(modelRes, shortSpecId, request.name());
 
         // Save OpenAPI Specs to a YAML file
         specStorageService.saveYaml(shortSpecId, yaml);
@@ -81,6 +88,11 @@ public class OpenSpecController {
         String unifiedDiff = updateSpecService.updateSpec(id, instruction);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(unifiedDiff);
+    }
+
+    @GetMapping(value = "/api/specs/{id}/accept", produces = "text/plain")
+    public String acceptUpdatedSpec(@PathVariable String id) throws IOException {
+        return specStorageService.overwriteCurrentYaml(id);
     }
 
     @GetMapping("/api/specs/validate/{id}")
@@ -112,18 +124,18 @@ public class OpenSpecController {
         return fixedYaml;
     }
 
-    @GetMapping(value = "api/specs/{id}", produces = "text/plain")
-    public ResponseEntity<String> getSpecById(@PathVariable String id) throws IOException {
-        String yaml = specStorageService.readYaml(id, true);
-        // String reconstructedYaml = parsingService.reconstructSpecs(specId);
-        return ResponseEntity.ok(yaml);
-    }
-
     @GetMapping("/api/swaggerhub/connect")
-    public Map<String, String> postMethodName() throws Exception {
+    public Map<String, String> connectToSwaggerhub() throws Exception {
         swaggerhubService.connect();
 
         return Map.of("Status", "Connected");
+    }
+
+    @PostMapping("/api/specs/{id}/publish")
+    public String postMethodName(@PathVariable String id) throws Exception {
+        swaggerhubService.publish(id);
+
+        return "Published Successfully";
     }
 
 }
