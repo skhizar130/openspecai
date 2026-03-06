@@ -168,6 +168,14 @@ Response: Published successfully
 
 ---
 
+### Preview SwaggerHub UI
+
+**GET** `/api/spec/{id}/preview`
+
+Response: Link to SwaggerHub UI
+
+---
+
 ## License
 
 MIT
