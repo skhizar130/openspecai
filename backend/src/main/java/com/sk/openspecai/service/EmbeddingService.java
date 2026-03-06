@@ -112,8 +112,19 @@ public class EmbeddingService {
                 // Map the results to DTO objects
                 return searchResult.matches()
                                 .stream().map(match -> new SearchResultDTO(
+                                                match.embeddingId(),
                                                 match.embedded().text(),
                                                 match.embedded().metadata().toMap()))
                                 .toList();
+        }
+
+        public void deletaAllChunks(String specId) {
+                Filter specIdFilter = metadataKey("specId").isEqualTo(specId);
+
+                List<SearchResultDTO> resultDTOs = retrieveChunksWithFilter(specIdFilter);
+
+                resultDTOs.stream().forEach(result -> {
+                        embeddingStore.remove(result.embeddingId());
+                });
         }
 }

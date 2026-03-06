@@ -1,6 +1,5 @@
 package com.sk.openspecai.service;
 
-import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,21 +29,14 @@ public class UpdateSpecService {
         this.diffService = diffService;
     }
 
-    /**
-     * Updates the OpenAPI spec for a given specId based on a user instruction.
-     * Fetches current operation YAML, sends it to the LLM for updates,
-     * merges it back into the spec, stores the updated spec, and returns the diff.
-     */
-    public String updateSpec(String specId, String userInstruction) throws IOException {
-        // Extract endpoint info (path + method) from instruction
+    // Modify current spec using LLM and chunks from ChromaDB
+    public String updateSpec(String specId, String userInstruction) throws Exception {
         Endpoint endpoint = extractEndpoint(userInstruction);
 
-        // Retrieve current YAML operation for the endpoint
         String currentOperationYaml = embeddingService.retrievePathChunks(specId,
                 endpoint.path(),
                 endpoint.method());
 
-        // Build prompt for LLM
         String llmPrompt = """
                 OPERATION METADATA:
                 Path: %s
@@ -57,32 +49,29 @@ public class UpdateSpecService {
                 %s
                 """.formatted(endpoint.path(), endpoint.method(), userInstruction, currentOperationYaml);
 
-        // Generate updated operation YAML using SpecsAssistant
         String updatedOperationYaml = specsAssistant.update(llmPrompt);
 
-        // Read full spec YAML
         String currentSpecYaml = specStorageService.readYaml(specId, true);
 
-        // Merge updated operation into full spec
         String mergedSpecYaml = parsingService.mergeOperation(currentSpecYaml, updatedOperationYaml, endpoint);
 
-        // Save updated spec
         specStorageService.saveYaml(specId + "-updated", mergedSpecYaml);
 
-        // Generate and return diff for user review
-        return diffService.generateUnifiedDiff(specId);
+        String unifiedDiff = diffService.generateUnifiedDiff(specId);
+
+        parsingService.overwriteChunks(specId);
+
+        specStorageService.overwriteCurrentYaml(specId);
+
+        return unifiedDiff;
     }
 
-    /**
-     * Extracts the intended HTTP method and path from a user instruction.
-     */
+    // Extract Path and Method from instruction
     public Endpoint extractEndpoint(String instruction) {
-        // Match HTTP method (GET, POST, etc.)
         String methodRegex = "\\b(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\\b";
         Matcher methodMatcher = Pattern.compile(methodRegex, Pattern.CASE_INSENSITIVE).matcher(instruction);
         String method = methodMatcher.find() ? methodMatcher.group() : "Not Found";
 
-        // Match API path starting with /
         String pathRegex = "(?<![a-zA-Z0-9])(/[a-zA-Z0-9/\\-._~{}%]+)";
         Matcher pathMatcher = Pattern.compile(pathRegex).matcher(instruction);
         String path = pathMatcher.find() ? pathMatcher.group() : "Not Found";

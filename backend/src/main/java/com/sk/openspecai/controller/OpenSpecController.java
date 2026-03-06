@@ -69,10 +69,8 @@ public class OpenSpecController {
         String specId = HexFormat.of().formatHex(hash);
         String shortSpecId = specId.substring(0, 16);
 
-        // Parse YAML
         String yaml = parsingService.parseAndStoreChunks(modelRes, shortSpecId, request.name());
 
-        // Save OpenAPI Specs to a YAML file
         specStorageService.saveYaml(shortSpecId, yaml);
 
         String response = "specsId: " + shortSpecId + "\n---\n" + yaml;
@@ -82,17 +80,12 @@ public class OpenSpecController {
 
     @PostMapping(value = "/api/specs/{id}", produces = "text/plain")
     public ResponseEntity<String> updateSpec(@PathVariable String id,
-            @RequestBody PromptRequest request) throws IOException {
+            @RequestBody PromptRequest request) throws Exception {
         String instruction = request.instruction();
 
         String unifiedDiff = updateSpecService.updateSpec(id, instruction);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(unifiedDiff);
-    }
-
-    @GetMapping(value = "/api/specs/{id}/accept", produces = "text/plain")
-    public String acceptUpdatedSpec(@PathVariable String id) throws IOException {
-        return specStorageService.overwriteCurrentYaml(id);
     }
 
     @GetMapping("/api/specs/validate/{id}")

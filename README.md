@@ -128,14 +128,6 @@ Response: Unified diff
 
 ---
 
-### Accept Modification
-
-**GET** `/api/specs/{id}/accept`
-
-Response: Updated spec
-
----
-
 ### Validate
 
 **GET** `/api/specs/validate/{id}?fix=false`

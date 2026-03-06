@@ -18,12 +18,15 @@ import com.sk.openspecai.model.SpecInfo;
 @Service
 public class ParsingService {
 
-    private final EmbeddingService embeddingService;
-    private final ObjectMapper yamlMapper;
+    private EmbeddingService embeddingService;
+    private ObjectMapper yamlMapper;
+    private SpecStorageService specStorageService;
 
-    // Constructor initializes YAML mapper and embedding service
-    public ParsingService(EmbeddingService embeddingService) {
+    public ParsingService(
+            EmbeddingService embeddingService,
+            SpecStorageService specStorageService) {
         this.embeddingService = embeddingService;
+        this.specStorageService = specStorageService;
 
         YAMLFactory factory = YAMLFactory.builder()
                 .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
@@ -44,7 +47,7 @@ public class ParsingService {
 
         JsonNode rootNode = this.yamlMapper.readTree(yamlContent);
 
-        storeGlobalInfo(rootNode, specId, name);
+        storeInfo(rootNode, specId, name);
         storeServers(rootNode, specId);
         storeOperations(rootNode, specId);
         storeSchemas(rootNode, specId);
@@ -110,8 +113,8 @@ public class ParsingService {
         embeddingService.add(serversYaml, metadata);
     }
 
-    // Store global info chunk
-    private void storeGlobalInfo(JsonNode rootNode, String specId, String name)
+    // Store info chunk
+    private void storeInfo(JsonNode rootNode, String specId, String name)
             throws JsonProcessingException {
         JsonNode infoNode = rootNode.path("info");
         String openApiVersion = rootNode.path("openapi").asText();
@@ -140,6 +143,7 @@ public class ParsingService {
         return mergedYaml;
     }
 
+    // Retrive name and version of spec
     public SpecInfo retriveInfo(String specId) throws Exception {
         SearchResultDTO resultDTO = embeddingService.retrieveInfoChunk(specId);
         String name = (String) resultDTO.metadata().get("name");
@@ -148,5 +152,16 @@ public class ParsingService {
                 .path("version").asText();
 
         return new SpecInfo(name, version);
+    }
+
+    // Delete existing chunks and store chunks from updated YAML
+    public void overwriteChunks(String specId) throws Exception {
+        String name = retriveInfo(specId).name();
+
+        embeddingService.deletaAllChunks(specId);
+
+        String updatedYaml = specStorageService.readYaml(specId, false);
+
+        parseAndStoreChunks(updatedYaml, specId, name);
     }
 }
