@@ -138,4 +138,9 @@ public class OpenSpecController {
         return "Published Successfully";
     }
 
+    @GetMapping("api/specs/{id}/preview")
+    public String previewSwaggerhub(@PathVariable String id) throws Exception {
+        return swaggerhubService.preview(id);
+    }
+
 }

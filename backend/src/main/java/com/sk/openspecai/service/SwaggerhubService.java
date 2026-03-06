@@ -87,4 +87,16 @@ public class SwaggerhubService {
                     response.body());
         }
     }
+
+    public String preview(String specId) throws Exception {
+        SpecInfo specInfo = parsingService.retriveInfo(specId);
+
+        String owner = tokenProvider.getOwner();
+        String apiName = specInfo.name();
+        String version = specInfo.version();
+        URI uri = URI.create("https://app.swaggerhub.com/apis/" + owner + "/" +
+                apiName + "/" + version);
+
+        return uri.toString();
+    }
 }
