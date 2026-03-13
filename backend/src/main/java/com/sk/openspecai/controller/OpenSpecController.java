@@ -7,14 +7,17 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sk.openspecai.service.SwaggerhubService;
-import com.sk.openspecai.dto.PromptRequest;
+import com.sk.openspecai.excpetion.IdGenerationException;
+import com.sk.openspecai.model.PromptRequest;
+import com.sk.openspecai.model.UpdateRequest;
 import com.sk.openspecai.service.ParsingService;
 import com.sk.openspecai.service.SpecStorageService;
 import com.sk.openspecai.service.SpecAssistant;
 import com.sk.openspecai.service.UpdateSpecService;
 import com.sk.openspecai.service.ValidationService;
 
-import java.io.IOException;
+import jakarta.validation.Valid;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -51,36 +54,41 @@ public class OpenSpecController {
     }
 
     @GetMapping(value = "api/specs/{id}", produces = "text/plain")
-    public ResponseEntity<String> getSpecById(@PathVariable String id) throws IOException {
+    public ResponseEntity<String> getSpecById(@PathVariable String id) {
         String yaml = specStorageService.readYaml(id, true);
         // String reconstructedYaml = parsingService.reconstructSpecs(specId);
         return ResponseEntity.ok(yaml);
     }
 
     @PostMapping(value = "/api/specs", produces = "text/plain")
-    public ResponseEntity<String> generateSpec(@RequestBody PromptRequest request)
-            throws NoSuchAlgorithmException, IOException {
+    public ResponseEntity<String> generateSpec(@Valid @RequestBody PromptRequest request) {
         // Send user prompt to AI model for OpenAPI specs generation
         String modelRes = specsAssistant.generate(request.instruction());
 
-        // Create deterministic UUID
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hash = digest.digest(modelRes.getBytes(StandardCharsets.UTF_8));
-        String specId = HexFormat.of().formatHex(hash);
-        String shortSpecId = specId.substring(0, 16);
+        try {
+            // Create deterministic UUID
+            MessageDigest digest;
+            digest = MessageDigest.getInstance("SHA-256");
 
-        String yaml = parsingService.parseAndStoreChunks(modelRes, shortSpecId, request.name());
+            byte[] hash = digest.digest(modelRes.getBytes(StandardCharsets.UTF_8));
+            String specId = HexFormat.of().formatHex(hash);
+            String shortSpecId = specId.substring(0, 16);
 
-        specStorageService.saveYaml(shortSpecId, yaml);
+            String yaml = parsingService.parseAndStoreChunks(modelRes, shortSpecId, request.name());
 
-        String response = "specsId: " + shortSpecId + "\n---\n" + yaml;
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            specStorageService.saveYaml(shortSpecId, yaml);
+
+            String response = "specsId: " + shortSpecId + "\n---\n" + yaml;
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IdGenerationException("Failed to generate ID for new spec");
+        }
 
     }
 
     @PostMapping(value = "/api/specs/{id}", produces = "text/plain")
     public ResponseEntity<String> updateSpec(@PathVariable String id,
-            @RequestBody PromptRequest request) throws Exception {
+            @Valid @RequestBody UpdateRequest request) {
         String instruction = request.instruction();
 
         String unifiedDiff = updateSpecService.updateSpec(id, instruction);
@@ -90,7 +98,7 @@ public class OpenSpecController {
 
     @GetMapping("/api/specs/validate/{id}")
     public String validateSpec(@PathVariable String id,
-            @RequestParam(value = "fix", defaultValue = "false") boolean fix) throws IOException, InterruptedException {
+            @RequestParam(value = "fix", defaultValue = "false") boolean fix) {
         String yaml = specStorageService.readYaml(id, true);
         String spectalOutput = validationService.validateYamlWithSpectral(yaml);
 
@@ -118,21 +126,21 @@ public class OpenSpecController {
     }
 
     @GetMapping("/api/swaggerhub/connect")
-    public Map<String, String> connectToSwaggerhub() throws Exception {
+    public Map<String, String> connectToSwaggerhub() {
         swaggerhubService.connect();
 
         return Map.of("Status", "Connected");
     }
 
     @PostMapping("/api/specs/{id}/publish")
-    public String postMethodName(@PathVariable String id) throws Exception {
+    public String postMethodName(@PathVariable String id) {
         swaggerhubService.publish(id);
 
         return "Published Successfully";
     }
 
     @GetMapping("api/specs/{id}/preview")
-    public String previewSwaggerhub(@PathVariable String id) throws Exception {
+    public String previewSwaggerhub(@PathVariable String id) {
         return swaggerhubService.preview(id);
     }
 

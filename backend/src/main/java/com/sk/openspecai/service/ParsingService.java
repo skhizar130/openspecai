@@ -6,13 +6,13 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-import com.sk.openspecai.dto.SearchResultDTO;
+import com.sk.openspecai.excpetion.SpecParsingException;
 import com.sk.openspecai.model.Endpoint;
+import com.sk.openspecai.model.SearchResultDTO;
 import com.sk.openspecai.model.SpecInfo;
 
 @Service
@@ -42,22 +42,23 @@ public class ParsingService {
     }
 
     // Parse YAML and store all chunks into embedding store
-    public String parseAndStoreChunks(String yamlContent, String specId, String name)
-            throws JsonMappingException, JsonProcessingException {
+    public String parseAndStoreChunks(String yamlContent, String specId, String name) {
+        try {
+            JsonNode rootNode = this.yamlMapper.readTree(yamlContent);
 
-        JsonNode rootNode = this.yamlMapper.readTree(yamlContent);
+            storeInfo(rootNode, specId, name);
+            storeServers(rootNode, specId);
+            storeOperations(rootNode, specId);
+            storeSchemas(rootNode, specId);
 
-        storeInfo(rootNode, specId, name);
-        storeServers(rootNode, specId);
-        storeOperations(rootNode, specId);
-        storeSchemas(rootNode, specId);
-
-        return yamlMapper.writeValueAsString(rootNode);
+            return yamlMapper.writeValueAsString(rootNode);
+        } catch (JsonProcessingException e) {
+            throw new SpecParsingException("Failed to parse OpenAPI spec");
+        }
     }
 
     // Store path-method chunks
-    public void storeOperations(JsonNode rootNode, String specId)
-            throws JsonMappingException, JsonProcessingException {
+    public void storeOperations(JsonNode rootNode, String specId) {
         JsonNode pathsNode = rootNode.path("paths");
         Iterator<String> pathIterator = pathsNode.fieldNames();
 
@@ -82,80 +83,99 @@ public class ParsingService {
     }
 
     // Store schema chunks
-    public void storeSchemas(JsonNode rootNode, String specId)
-            throws JsonMappingException, JsonProcessingException {
+    public void storeSchemas(JsonNode rootNode, String specId) {
         JsonNode schemasNode = rootNode.path("components").path("schemas");
         Iterator<String> schemaIterator = schemasNode.fieldNames();
 
         while (schemaIterator.hasNext()) {
             String schemaName = schemaIterator.next();
             JsonNode schemaBody = schemasNode.get(schemaName);
-            String schemaYaml = this.yamlMapper.writeValueAsString(schemaBody);
+            try {
 
-            Map<String, String> metadata = Map.of(
-                    "chunkType", "SCHEMA",
-                    "schemaName", schemaName,
-                    "specId", specId);
+                String schemaYaml = this.yamlMapper.writeValueAsString(schemaBody);
 
-            embeddingService.add(schemaYaml, metadata);
+                Map<String, String> metadata = Map.of(
+                        "chunkType", "SCHEMA",
+                        "schemaName", schemaName,
+                        "specId", specId);
+
+                embeddingService.add(schemaYaml, metadata);
+            } catch (JsonProcessingException e) {
+                throw new SpecParsingException("Failed to parse OpenAPI spec");
+            }
         }
     }
 
     // Store servers chunk
-    private void storeServers(JsonNode rootNode, String specId) throws JsonProcessingException {
+    private void storeServers(JsonNode rootNode, String specId) {
         JsonNode serversNode = rootNode.path("servers");
-        String serversYaml = this.yamlMapper.writeValueAsString(serversNode);
+        try {
+            String serversYaml = this.yamlMapper.writeValueAsString(serversNode);
 
-        Map<String, String> metadata = Map.of(
-                "chunkType", "SERVERS",
-                "specId", specId);
+            Map<String, String> metadata = Map.of(
+                    "chunkType", "SERVERS",
+                    "specId", specId);
 
-        embeddingService.add(serversYaml, metadata);
+            embeddingService.add(serversYaml, metadata);
+        } catch (JsonProcessingException e) {
+            throw new SpecParsingException("Failed to parse OpenAPI spec");
+        }
     }
 
     // Store info chunk
-    private void storeInfo(JsonNode rootNode, String specId, String name)
-            throws JsonProcessingException {
+    private void storeInfo(JsonNode rootNode, String specId, String name) {
         JsonNode infoNode = rootNode.path("info");
         String openApiVersion = rootNode.path("openapi").asText();
-        String infoYaml = yamlMapper.writeValueAsString(infoNode);
 
-        embeddingService.add(infoYaml, Map.of(
-                "chunkType", "INFO",
-                "specId", specId,
-                "openapi", openApiVersion,
-                "name", name));
+        try {
+            String infoYaml = yamlMapper.writeValueAsString(infoNode);
+
+            embeddingService.add(infoYaml, Map.of(
+                    "chunkType", "INFO",
+                    "specId", specId,
+                    "openapi", openApiVersion,
+                    "name", name));
+        } catch (JsonProcessingException e) {
+            throw new SpecParsingException("Failed to parse OpenAPI spec");
+        }
     }
 
     // Merge a single updated operation chunk into the full YAML spec
     @SuppressWarnings("unchecked")
-    public String mergeOperation(String currentYaml, String updatedOperationYaml, Endpoint endpoint)
-            throws JsonMappingException, JsonProcessingException {
-        Map<String, Object> specMap = yamlMapper.readValue(currentYaml, Map.class);
-        Map<String, Object> pathsMap = (Map<String, Object>) specMap.get("paths");
-        Map<String, Object> targetPathMap = (Map<String, Object>) pathsMap.get(endpoint.path());
+    public String mergeOperation(String currentYaml, String updatedOperationYaml, Endpoint endpoint) {
+        try {
+            Map<String, Object> specMap = yamlMapper.readValue(currentYaml, Map.class);
+            Map<String, Object> pathsMap = (Map<String, Object>) specMap.get("paths");
+            Map<String, Object> targetPathMap = (Map<String, Object>) pathsMap.get(endpoint.path());
 
-        Map<String, Object> updatedOperationMap = yamlMapper.readValue(updatedOperationYaml, Map.class);
-        targetPathMap.put(endpoint.method().toLowerCase(), updatedOperationMap);
+            Map<String, Object> updatedOperationMap = yamlMapper.readValue(updatedOperationYaml, Map.class);
+            targetPathMap.put(endpoint.method().toLowerCase(), updatedOperationMap);
 
-        String mergedYaml = yamlMapper.writeValueAsString(specMap);
+            String mergedYaml = yamlMapper.writeValueAsString(specMap);
 
-        return mergedYaml;
+            return mergedYaml;
+        } catch (JsonProcessingException e) {
+            throw new SpecParsingException("Failed to parse OpenAPI spec");
+        }
     }
 
     // Retrive name and version of spec
-    public SpecInfo retriveInfo(String specId) throws Exception {
+    public SpecInfo retriveInfo(String specId) {
         SearchResultDTO resultDTO = embeddingService.retrieveInfoChunk(specId);
         String name = (String) resultDTO.metadata().get("name");
-        String version = this.yamlMapper
-                .readTree(resultDTO.content())
-                .path("version").asText();
+        try {
+            String version = this.yamlMapper
+                    .readTree(resultDTO.content())
+                    .path("version").asText();
 
-        return new SpecInfo(name, version);
+            return new SpecInfo(name, version);
+        } catch (JsonProcessingException e) {
+            throw new SpecParsingException("Failed to parse OpenAPI spec");
+        }
     }
 
     // Delete existing chunks and store chunks from updated YAML
-    public void overwriteChunks(String specId) throws Exception {
+    public void overwriteChunks(String specId) {
         String name = retriveInfo(specId).name();
 
         embeddingService.deletaAllChunks(specId);

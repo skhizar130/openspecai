@@ -1,5 +1,6 @@
 package com.sk.openspecai.service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -10,6 +11,10 @@ import java.time.Duration;
 import org.springframework.stereotype.Service;
 
 import com.sk.openspecai.auth.TokenProvider;
+import com.sk.openspecai.excpetion.InvalidSwaggerHubTokenException;
+import com.sk.openspecai.excpetion.OwnerNotFoundException;
+import com.sk.openspecai.excpetion.SwaggerHubPublishException;
+import com.sk.openspecai.excpetion.SwaggerHubUnavailableException;
 import com.sk.openspecai.model.SpecInfo;
 
 @Service
@@ -32,7 +37,7 @@ public class SwaggerhubService {
         this.parsingService = parsingService;
     }
 
-    public void connect() throws Exception {
+    public void connect() {
         String apiKey = tokenProvider.getToken();
         String owner = tokenProvider.getOwner();
         HttpRequest request = HttpRequest.newBuilder()
@@ -42,19 +47,27 @@ public class SwaggerhubService {
                 .GET()
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
-        int statusCode = response.statusCode();
+        try {
+            HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+            int statusCode = response.statusCode();
 
-        if (statusCode == 401 || statusCode == 403) {
-            throw new Exception("Invalid SwaggerHub API key");
-        }
+            if (statusCode == 401 || statusCode == 403) {
+                throw new InvalidSwaggerHubTokenException("Invalid SwaggerHub API key");
+            }
 
-        if (statusCode != 200 && statusCode != 204) {
-            throw new Exception("SwaggerHub API unavailable");
+            if (statusCode == 404) {
+                throw new OwnerNotFoundException("Owner not found");
+            }
+
+            if (statusCode != 200 && statusCode != 204) {
+                throw new SwaggerHubUnavailableException("SwaggerHub API unavailable");
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new SwaggerHubUnavailableException("Failed to connect to SwaggerHub: " + e.getMessage());
         }
     }
 
-    public void publish(String specId) throws Exception {
+    public void publish(String specId) {
         String yaml = specStorageService.readYaml(specId, true);
 
         SpecInfo specInfo = parsingService.retriveInfo(specId);
@@ -74,21 +87,27 @@ public class SwaggerhubService {
                 .timeout(Duration.ofSeconds(10))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request,
-                BodyHandlers.ofString());
-        int statusCode = response.statusCode();
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request,
+                    BodyHandlers.ofString());
 
-        if (statusCode == 200 || statusCode == 201) {
-            System.out.println("statusCode: " + statusCode);
-            System.out.println("Response: " + response.body());
-        } else {
-            // throw meaningful exception
-            throw new Exception("SwaggerHub publish failed: " + statusCode + " " +
-                    response.body());
+            int statusCode = response.statusCode();
+
+            if (statusCode == 200 || statusCode == 201) {
+                System.out.println("statusCode: " + statusCode);
+                System.out.println("Response: " + response.body());
+            } else {
+                throw new SwaggerHubPublishException("Failed to publish to SwaggerHub: " + statusCode + " " +
+                        response.body());
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new SwaggerHubUnavailableException("Failed to connect to SwaggerHub: " + e.getMessage());
         }
+
     }
 
-    public String preview(String specId) throws Exception {
+    public String preview(String specId) {
         SpecInfo specInfo = parsingService.retriveInfo(specId);
 
         String owner = tokenProvider.getOwner();

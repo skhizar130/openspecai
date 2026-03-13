@@ -1,4 +1,4 @@
-package com.sk.openspecai.dto;
+package com.sk.openspecai.model;
 
 import java.util.Map;
 

@@ -19,14 +19,7 @@ public class DiffService {
         this.specStorageService = specStorageService;
     }
 
-    /**
-     * Generates a unified diff between the current and updated YAML specification.
-     *
-     * @param specId The identifier of the spec.
-     * @return Unified diff as a single string.
-     * @throws IOException
-     */
-    public String generateUnifiedDiff(String specId) throws IOException {
+    public String generateUnifiedDiff(String specId) {
         // Read current and updated YAML as lines
         List<String> currentYamlLines = specStorageService.readYamlLines(specId, true);
         List<String> updatedYamlLines = specStorageService.readYamlLines(specId, false);
@@ -46,14 +39,6 @@ public class DiffService {
         return String.join("\n", unifiedDiff);
     }
 
-    /**
-     * Returns the current and updated YAML as a map for Monaco editor style
-     * diffing.
-     *
-     * @param specId The identifier of the spec.
-     * @return Map with keys "original" and "modified".
-     * @throws IOException
-     */
     public Map<String, String> getYamlDiffForEditor(String specId) throws IOException {
         String currentYaml = specStorageService.readYaml(specId, true);
         String updatedYaml = specStorageService.readYaml(specId, false);

@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 
+import com.sk.openspecai.excpetion.EndpointNotFoundException;
 import com.sk.openspecai.model.Endpoint;
 
 @Service
@@ -30,12 +31,17 @@ public class UpdateSpecService {
     }
 
     // Modify current spec using LLM and chunks from ChromaDB
-    public String updateSpec(String specId, String userInstruction) throws Exception {
+    public String updateSpec(String specId, String userInstruction) {
         Endpoint endpoint = extractEndpoint(userInstruction);
 
         String currentOperationYaml = embeddingService.retrievePathChunks(specId,
                 endpoint.path(),
                 endpoint.method());
+
+        if (currentOperationYaml == null) {
+            throw new EndpointNotFoundException(
+                    endpoint.method() + " " + endpoint.path() + " endpoint not found for specId: " + specId);
+        }
 
         String llmPrompt = """
                 OPERATION METADATA:

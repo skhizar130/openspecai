@@ -227,6 +227,7 @@ public interface SpecAssistant {
       Ensure 2-space indentation for valid YAML structure.
       Format all YAML arrays using indented block style (2-space indentation for list indicators) and ensure all floating-point numbers preserve their original decimal precision (e.g., use 100.50 instead of 10
       For string values containing commas, colons, or special characters (like descriptions), explicitly wrap them in single quotes (e.g., description: 'Text, with comma').
+      Do not change summary, operationId or description unless instructed
 
       Sample input:
       OPERATION METADATA:
